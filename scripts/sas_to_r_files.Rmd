@@ -1,0 +1,101 @@
+---
+title: "Pulling data from Comcare to R"
+author: "Chris LeBoa"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+
+#install.packages("haven")
+
+library(tidyverse)
+library(haven)
+library(fs)
+
+#data_dir <- "/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data"
+
+# all_files <-
+#   fs::dir_ls(path = data_dir) %>%
+#   map(read_sas)
+# 
+# names(all_files) <- c("bcr", "ccs_ch", "ccs_hh", "clinical_enrollment", "lab_enrollment", "ve")
+# list2env(all_files ,.GlobalEnv)
+ccs_data_ch_cdc <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch_2020_03_18.sas7bdat")
+ccs_data_ch <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch__2020_04_24.sas7bdat")
+ccs_data_hh <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_hh__2020_04_24.sas7bdat")
+hospital_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__2020_07_06.sas7bdat")
+bcr_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/bcr__2020_04_02.sas7bdat")
+
+
+
+```
+
+#Evaluate the hospital variable of CDC Data Table 
+```{r}
+ccs_data_ch_cdc %>% 
+  count(hosp, PHASE)
+
+glimpse(ccs_data_hh)
+
+ccs_data_ch_cdc %>% 
+  filter(!is.na(hosp_admit_site)) %>% 
+  ggplot(aes(color = as_factor(hosp_admit_site))) + 
+  geom_point(aes(ccs_gps1_latitude, ccs_gps1_longitude)) +
+  scale_color_manual(values = c("black", "red"))
+  
+
+#view(ccs_data_ch_cdc) 
+
+ccs_data_hh %>% 
+  group_by(hhid) %>% 
+  count(status) %>% 
+  arrange(desc(n))
+
+ccs_data_ch %>% 
+  select(hhid, X_index, X_parent_index, ch_id,uhp, psu)
+
+# ccs_data_hh %>% 
+#   select(hhid,uhp, psu, today, PHASE) %>% 
+#   arrange(desc(today))
+
+
+
+```
+
+
+#Basic Frequencies 
+
+```{r}
+
+#number of hh included in the study 
+ccs_data_hh %>% 
+  filter(status == "INT") %>% 
+  count(hhid) %>% 
+  arrange(desc(n))
+
+# Number of individual childrene included 
+ccs_data_ch %>% 
+  filter(status == "INT") %>% 
+  mutate(
+    child_under5 = if_else(liveyr <= 5, 1, 0),
+    hosp_studysite = if_else(hosp_admit_a == 1 | hosp_admit_b == 1 | hosp_admit_c == 1 | hosp_admit_d == 1 | hosp_admit_e == 1, 1, 0)
+         ) %>% 
+  count(hosp_studysite, child_under5, PHASE)
+
+
+#view(ccs_data_ch)
+ccs_data_ch %>% 
+  filter(status == "INT") %>% 
+  mutate(child_under5 = if_else(liveyr <= 5, 1, 0)) %>% 
+  count(child_under5, PHASE, hosp)
+```
+
+

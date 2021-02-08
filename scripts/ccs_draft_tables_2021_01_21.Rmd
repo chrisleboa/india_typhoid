@@ -1,0 +1,306 @@
+---
+title: "Pulling data from Comcare to R"
+author: "Chris LeBoa"
+date: "`r Sys.Date()`"
+output: 
+  word_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# Libraries
+#install.packages("haven")
+library(tidyverse)
+library(haven)
+library(fs)
+library(tableone)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Load Data
+
+
+## CCS Data 
+ccs_data_ch_cdc <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch_2020_03_18.sas7bdat")
+  ##This is the Child based file with the addition of specific CDC variables 
+ccs_data_ch <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch__2020_04_24.sas7bdat")
+ ## Child data missing the CDC variables 
+ccs_data_hh <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_hh__2020_04_24.sas7bdat")
+  ## Household level data from the CDC 
+
+## Hospital Level Data 
+hospital_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__2020_07_06.sas7bdat")
+  ## Hospital Lavel 
+
+## Not sure 
+bcr_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/bcr__2020_04_02.sas7bdat")
+
+```
+
+
+```{r message=FALSE, warning=FALSE}
+
+
+# Parameters 
+
+sex_recode <- 
+  c(
+  `1` = "Male",
+  `2` = "Female"
+)
+
+yes_no_recode <- 
+   c(
+  `1` = "Yes",
+  `0` = "No"
+)
+
+hhead_recode <- c(
+  `1` = "Respondent",
+`2` = "Father of child", 
+`3` = "Mother of child", 
+`4` = "Grandparent of child", 
+`88` = "Other",
+`99` = "Declined to answer"
+)
+
+status_recode <- c(
+  INT = "Interviewed-Eligible",
+  ZEH = "Discovered no/zero eligible HH members",
+  REF = "Refused-Eligible",
+  VAC = "Clearly vacant house",
+  UNA =  "Unavailable-believed to be eligible",
+  NAU = "Not available-eligbility unconfirmed",
+  NNC = "Not Available- Non-eligibility confirmed"
+)
+
+hh_edu_recode <- c(
+  `1` = "Illiterate",
+  `2` = "Primary school certificate (through Grade 4)",
+  `3` = "Middle school certificate (Grade 5 - 10)",
+  `4` = "High school certificate (Grade 11 - 12)",
+  `5` = "Intermediate or post high school diploma",
+  `6` = "Graduate (Bachelors degree)",
+  `7` = "Post graduate, profession, or honors"
+)
+
+hh_occu_recode <- c(
+  `1` = "Legislators, Senior Officials & Managers",
+ `2` = "Professionals (e.g. Doctors, Engineers, Bank managers)",
+ `3` = "Technicians and Associate Professionals", 
+ `4` = "Clerks",
+ `5` = "Skilled Workers and Shop & Market Sales Workers",
+ `6` = "Skilled Agricultural & Fishery Workers",
+ `7` = "Craft & Related Trade Workers",
+ `8` = "Plant & Machine Operators and Assemblers",
+ `9` = "Elementary Occupation (e.g. Domestic servant, peon, watchman)",
+ `10` = "Mathadi or quarry workers",
+ `11` = "Unemployed",
+ `88` = "Other",
+ `99` = "Refused"
+)
+
+toilet_recode <- c(
+  `1` = "No facility / open defecation",
+  `2` = "Traditional pit latrine",
+  `3` = "Sarvajanik toilet (public toilets on the streets)",
+  `4` = "Flush toilet",
+  `88` = "Other", 
+  `99` = "Refused"
+)
+
+child_schooling_recode <- c(
+  `1` = "Yes", 
+  `2` = "Not of school age",
+  `3` = "Never attended school", 
+  `99` = "DK/Refused"
+)
+
+child_schooling_level_recode <- c(
+  `1` = "Illiterate",
+  `2` = "Primary school certificate (through Grade 4)",
+  `3` = "Middle school certificate (Grade 5 - 10)",
+  `4` = "High school certificate (Grade 11 - 12)",
+  `99` ="Declined to answer"
+)
+
+
+
+```
+
+# CCS Enrollment Numbers 
+```{r}
+# ccs_data_ch_cdc %>% 
+#   count(hosp, PHASE)
+# 
+# glimpse(ccs_data_hh)
+
+
+#view(ccs_data_ch_cdc) 
+
+
+#Breakdown of Status of households approached 
+ccs_data_hh %>% 
+  group_by(PHASE) %>% 
+  count(status) %>% 
+  arrange(desc(n)) %>% 
+  pivot_wider(names_from = PHASE, names_prefix = "Phase ", values_from = n) %>% 
+ transmute("Enrollment status" = recode(status, !!!status_recode), `Phase 1`, `Phase 2`) %>% 
+  knitr::kable()
+
+
+#Children enrolled 
+ccs_data_ch %>% 
+  group_by(PHASE) %>% 
+  count(status) %>% 
+  arrange(desc(n)) %>% 
+  pivot_wider(names_from = PHASE, names_prefix = "Phase ", values_from = n) %>% 
+ transmute("Children Enrollment" = recode(status, !!!status_recode), `Phase 1`, `Phase 2`) %>% 
+   knitr::kable()
+
+```
+
+#Household Characteristics 
+
+```{r, include=FALSE}
+
+ccs_data_hh_formatted <- 
+  ccs_data_hh %>% 
+  filter(status == "INT") %>% 
+  transmute(
+    "Age Respondent" = ve_agerel, 
+    "PHASE" = PHASE,
+    "Number of Children" = children,
+    "Sex Respondent" = recode(ve_sexresp, !!!sex_recode), 
+    "Household Head (HH)" = recode(ve_hhead, !!!hhead_recode), 
+    "HH Education"= recode(ve_hheadedu, !!!hh_edu_recode), 
+    "HH Occupation" = recode(ses_hhhocu, !!!hh_occu_recode), 
+    "Spending (Rupees)" = ses_spend,
+    "Drinking Water Source" = 
+      case_when(
+        ses_watsrc == 1 |ses_watsrc == 2 ~ "Piped Water", 
+        ses_watsrc == 3  ~ "Public Tap", 
+        ses_watsrc == 6 |ses_watsrc == 8 ~ "Unprotected Well/Spring", 
+        ses_watsrc == 7  ~ "Protected Well", 
+        ses_watsrc == 10  ~ "Tanker Truck", 
+        ses_watsrc == 13 ~ "Bottled water", 
+        TRUE ~ "Other"
+      ), 
+    "Water Treatment" = recode(ses_watsafe, !!!yes_no_recode), 
+    "Hand Wash Location" = recode(ses_hwplace, !!!yes_no_recode), 
+    "Hand Wash Water" = recode(ses_hwwater, !!!yes_no_recode),
+    "Hand Wash Soap" = recode(ses_hwsoap_a, !!!yes_no_recode),
+    "Toilet Type" = recode(ses_toitype, !!!toilet_recode), 
+    "Shared Toilet" = recode(ses_toiletshare, !!!yes_no_recode)
+  )
+
+ccs_dara_ch_formatted <- 
+  ccs_data_ch_cdc %>% 
+  transmute(
+    "Houshold Size" = numhh, 
+    "PHASE" = PHASE,
+    "Chuld age" = ageyrcalc, 
+    "Child Under 5" = if_else(ageyrcalc <= 5, "Yes", "No"), 
+    "Child Time in Navi Mumbai" = ve_chliveyr, 
+    "Child Sex" = recode(sex, !!!sex_recode), 
+    "Child Schooling" = recode(school, !!!child_schooling_recode),
+    "Child Education" = recode(chedu, !!!child_schooling_level_recode), 
+    "Typhoid Vaccine Campaign" = recode(tcv_vax, !!!yes_no_recode), 
+    "Other Typhoid Vaccine" = recode(typhoid_vax, !!!yes_no_recode), 
+    "Fever in last month" = recode(fev1mo, !!!yes_no_recode), 
+    "3 Day Fever" = recode(fev3day, !!!yes_no_recode), 
+    "Fever Treatment" = recode(trt, !!!yes_no_recode), 
+    "Study Site Treatment Location" = 
+      if_else(
+      ccs_trtloc_a == "1" |
+        ccs_trtloc_b == "1" |
+        ccs_trtloc_c == "1" |
+        ccs_trtloc_d == "1" , 
+      "Yes", "No")
+  )
+  
+ch_vars <- c("Houshold Size", "Chuld age", "Child Under 5", "Child Time in Navi Mumbai", "Child Sex", "Child Schooling", "Child Education", "Typhoid Vaccine Campaign", "Other Typhoid Vaccine", "Fever in last month", "3 Day Fever", "Fever Treatment", "Study Site Treatment Location")
+
+ch_vars_dem <- c("Houshold Size", "Chuld age", "Child Under 5", "Child Time in Navi Mumbai", "Child Sex", "Child Schooling", "Child Education")
+
+ch_vars_health <- c("Typhoid Vaccine Campaign", "Other Typhoid Vaccine", "Fever in last month", "3 Day Fever", "Fever Treatment", "Study Site Treatment Location")
+
+ch_cat_vars_dem <- c("Child Schooling", "Child Education")
+
+ch_cat_vars_health <- c("Other Typhoid Vaccine")
+
+
+```
+
+
+```{r}
+
+#Splitting up individually into tables 
+# ccs_data_hh %>% 
+#   filter(status == "INT") %>% 
+#   group_by(PHASE) %>% 
+#   mutate(
+#     hh_edu = recode(ve_hheadedu, !!!hh_edu_recode)
+#   ) %>% 
+#  count(hh_edu) %>% 
+#  pivot_wider(names_from = PHASE, names_prefix = "Phase ", values_from = n) %>% 
+#  transmute("Education status" = hh_edu, `Phase 1`, `Phase 2`)
+  
+hh_vars <- c("Number of Children", "Age Respondent", "Sex Respondent", "Household Head (HH)","HH Education", "HH Occupation", "Spending (Rupees)", "Drinking Water Source", "Water Treatment", "Hand Wash Location", "Hand Wash Water", "Hand Wash Soap", "Toilet Type", "Shared Toilet")
+
+hh_cat_vars <-  c("Household Head (HH)","HH Education", "HH Occupation", "Drinking Water Source", "Hand Wash Location", "Toilet Type")
+
+tab2 <- CreateTableOne(vars = hh_vars, data = ccs_data_hh_formatted, factorVars = hh_cat_vars, strata = "PHASE")
+
+tab2
+```
+
+```{r}
+tab3 <- CreateTableOne(vars = ch_vars_dem, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_dem, strata = "PHASE")
+
+tab3
+```
+
+
+#Basic Frequencies 
+
+```{r}
+
+#number of hh included in the study 
+ccs_data_hh %>% 
+  filter(status == "INT")
+  
+
+# Number of individual childrene included 
+ccs_data_ch %>% 
+  filter(status == "INT") %>% 
+  mutate(
+    child_under5 = if_else(liveyr <= 5, 1, 0),
+    hosp_studysite = if_else(hosp_admit_a == 1 | hosp_admit_b == 1 | hosp_admit_c == 1 | hosp_admit_d == 1 | hosp_admit_e == 1, 1, 0)
+         ) %>% 
+  count(hosp_studysite, child_under5, PHASE)
+
+
+#view(ccs_data_ch)
+ccs_data_ch %>% 
+  filter(status == "INT") %>% 
+  mutate(child_under5 = if_else(liveyr <= 5, 1, 0)) %>% 
+  count(child_under5, PHASE, hosp)
+```
+
+## Mapping Hospital use
+```{r}
+ccs_data_ch_cdc %>% 
+  filter(!is.na(hosp_admit_site)) %>% 
+  ggplot(aes(color = as_factor(hosp_admit_site))) + 
+  geom_point(aes(ccs_gps1_latitude, ccs_gps1_longitude)) +
+  scale_color_manual(values = c("black", "red"))
+  
+```
+
+
