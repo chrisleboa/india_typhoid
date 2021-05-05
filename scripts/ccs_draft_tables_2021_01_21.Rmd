@@ -40,6 +40,9 @@ hospital_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__
 ## Not sure 
 bcr_data <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/bcr__2020_04_02.sas7bdat")
 
+# Write out data 
+
+
 ```
 
 
@@ -129,6 +132,13 @@ child_schooling_level_recode <- c(
   `99` ="Declined to answer"
 )
 
+yes_no_school_recode <- 
+   c(
+  `1` = "Yes",
+  `0` = "No", 
+  `2` = "Child doesn’t attend school"
+)
+
 
 
 ```
@@ -163,6 +173,9 @@ ccs_data_ch %>%
  transmute("Children Enrollment" = recode(status, !!!status_recode), `Phase 1`, `Phase 2`) %>% 
    knitr::kable()
 
+ccs_data_ch_cdc %>% 
+  count(fever_sch30)
+
 ```
 
 #Household Characteristics 
@@ -189,7 +202,7 @@ ccs_data_hh_formatted <-
         ses_watsrc == 7  ~ "Protected Well", 
         ses_watsrc == 10  ~ "Tanker Truck", 
         ses_watsrc == 13 ~ "Bottled water", 
-        TRUE ~ "Other"
+        TRUE ~ NA_character_
       ), 
     "Water Treatment" = recode(ses_watsafe, !!!yes_no_recode), 
     "Hand Wash Location" = recode(ses_hwplace, !!!yes_no_recode), 
@@ -210,29 +223,123 @@ ccs_dara_ch_formatted <-
     "Child Sex" = recode(sex, !!!sex_recode), 
     "Child Schooling" = recode(school, !!!child_schooling_recode),
     "Child Education" = recode(chedu, !!!child_schooling_level_recode), 
+    "Received All Normal Vaccines" = recode(ve_allvacs, !!!yes_no_recode),
+    "Received Typhoid Vaccine" = recode(ve_tvac, !!!yes_no_recode),
     "Typhoid Vaccine Campaign" = recode(tcv_vax, !!!yes_no_recode), 
     "Other Typhoid Vaccine" = recode(typhoid_vax, !!!yes_no_recode), 
+    "Other Typhoid Vaccine Type" = 
+      case_when(
+        ve_ncothtyp_a == 1 ~ "TCV",
+        ve_ncothtyp_b == 1 ~ "Polysaccharide", 
+        ve_ncothtyp_c == 1 ~ "Not Specified", 
+        TRUE ~ NA_character_
+      ),
     "Fever in last month" = recode(fev1mo, !!!yes_no_recode), 
-    "3 Day Fever" = recode(fev3day, !!!yes_no_recode), 
-    "Fever Treatment" = recode(trt, !!!yes_no_recode), 
+    "3 Day Fever (30 days)" = recode(fev3day, !!!yes_no_recode),
+    "Fever other symptoms (30 days)" =
+      case_when(
+      symp_a == 1 ~ "none", 
+      symp_b == 1 ~ "cold/runny nose",
+      symp_c == 1 ~ "headache",
+      symp_d == 1 ~ "bodyache",
+      symp_e == 1 ~ "sore throat",
+      symp_f == 1 ~ "rash",
+      symp_e == 1 ~ "cough",
+      symp_g == 1 ~ "ear infection",
+      symp_h == 1 ~ "skin boils",
+      symp_i == 1 ~ "diarrhea",
+      symp_j == 1 ~ "abdominal pain",
+      TRUE ~ NA_character_
+    ), 
+    "Fever where child missed school (30 days)" = recode(fever_sch30, !!!yes_no_school_recode ), 
+    "Fever where hh member missed work (30 days)" = recode(fever_work30, !!!yes_no_recode), 
+    "Fever where perscribed antibiotics (30 days)" = recode(fever_antibiotics30, !!!yes_no_recode), 
+    "Fever where child missed school (3 months)" = recode(fever_sch3, !!!yes_no_school_recode), 
+    "Child fever where hh member missed work (3 months)" = recode(fever_work3, !!!yes_no_recode),
+    "Fever where perscribed antibiotics (3 months)" = recode(fever_antibiotics3, !!!yes_no_recode), 
+    "Sought treatment for Fever (30 days)" = recode(trt, !!!yes_no_recode), 
+    "Fever Treatment Location (30 days)" = 
+      case_when(
+        ccs_trtloc_a == "1" | ccs_trtloc_b == "1" | ccs_trtloc_c == "1" |ccs_trtloc_d == "1" ~ "study site", 
+        ccs_trtloc_a == "1" | ccs_trtloc_b == "1" | ccs_trtloc_c == "1" |ccs_trtloc_d == "1"| ccs_trtloc_e == "1" | ccs_trtloc_f == "1" | ccs_trtloc_g == "1" | ccs_trtloc_i == "1" ~ "Hospital (including study sites)", 
+        ccs_trtloc_j == "1" ~ "Private physician/clinic",
+        ccs_trtloc_k == "1" ~ "Pharmacy",
+        TRUE ~ NA_character_
+      ), 
     "Study Site Treatment Location" = 
       if_else(
       ccs_trtloc_a == "1" |
         ccs_trtloc_b == "1" |
         ccs_trtloc_c == "1" |
         ccs_trtloc_d == "1" , 
-      "Yes", "No")
+      "Yes", "No"), 
+    "Fever where child missed school (12 months)" = recode(fever_sch, !!!yes_no_school_recode ), 
+    "Fever where hh member missed work (12 months)" = recode(fever_work, !!!yes_no_recode), 
+    "Fever where perscribed antibiotics (12 months)" = recode(fever_antibiotics, !!!yes_no_recode), 
+    "Fever with hospitalization (12 months)" = recode(hosp, !!! yes_no_recode), 
+    "Hospitalization location (12 months)" = if_else(hosp_admit_site == 1, "study site", "not study site")
   )
   
-ch_vars <- c("Houshold Size", "Chuld age", "Child Under 5", "Child Time in Navi Mumbai", "Child Sex", "Child Schooling", "Child Education", "Typhoid Vaccine Campaign", "Other Typhoid Vaccine", "Fever in last month", "3 Day Fever", "Fever Treatment", "Study Site Treatment Location")
+ch_vars <- 
+  c(
+    "Houshold Size",
+    "Chuld age",
+    "Child Under 5",
+    "Child Time in Navi Mumbai",
+    "Child Sex",
+    "Child Schooling",
+    "Child Education", 
+    "Typhoid Vaccine Campaign", 
+    "Other Typhoid Vaccine",
+    "Fever in last month",
+    "3 Day Fever",
+    "Fever Treatment",
+    "Study Site Treatment Location"
+    )
 
-ch_vars_dem <- c("Houshold Size", "Chuld age", "Child Under 5", "Child Time in Navi Mumbai", "Child Sex", "Child Schooling", "Child Education")
+ch_vars_dem <- 
+  c(
+    "Houshold Size",
+    "Chuld age", 
+    "Child Under 5",
+    "Child Time in Navi Mumbai",
+    "Child Sex",
+    "Child Schooling",
+    "Child Education"
+    )
 
-ch_vars_health <- c("Typhoid Vaccine Campaign", "Other Typhoid Vaccine", "Fever in last month", "3 Day Fever", "Fever Treatment", "Study Site Treatment Location")
+ch_vars_health_vax <- 
+  c(
+    "Received All Normal Vaccines", 
+    "Received Typhoid Vaccine",
+    "Typhoid Vaccine Campaign",
+    "Other Typhoid Vaccine",
+    "Other Typhoid Vaccine Type"
+    )
+
+ch_vars_health_fever <- 
+  c(
+    "Fever in last month",
+    "3 Day Fever (30 days)",
+    "Fever other symptoms (30 days)",
+    "Fever where child missed school (30 days)", 
+    "Fever where hh member missed work (30 days)", 
+    "Fever where perscribed antibiotics (30 days)", 
+    "Sought treatment for Fever (30 days)", 
+    "Fever Treatment Location (30 days)", 
+    "Fever where child missed school (3 months)", 
+    "Child fever where hh member missed work (3 months)", 
+    "Fever where perscribed antibiotics (3 months)",
+    "Fever where child missed school (12 months)", 
+    "Fever where hh member missed work (12 months)", 
+    "Fever where perscribed antibiotics (12 months)", 
+    "Fever with hospitalization (12 months)", 
+    "Hospitalization location (12 months)" 
+  )
 
 ch_cat_vars_dem <- c("Child Schooling", "Child Education")
-
-ch_cat_vars_health <- c("Other Typhoid Vaccine")
+ch_cat_vars_health_vax <- c("Other Typhoid Vaccine Type")
+ch_cat_vars_health_fever <- c("Fever other symptoms (30 days)", "Fever Treatment Location (30 days)" )
 
 
 ```
@@ -259,13 +366,24 @@ tab2 <- CreateTableOne(vars = hh_vars, data = ccs_data_hh_formatted, factorVars 
 
 tab2
 ```
-
+#Child Demographics 
 ```{r}
 tab3 <- CreateTableOne(vars = ch_vars_dem, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_dem, strata = "PHASE")
 
 tab3
 ```
+#Child healthcare vaccines
+```{r}
+tab4 <- CreateTableOne(vars = ch_vars_health_vax, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_health_vax, strata = "PHASE")
+tab4
 
+```
+#Child healthcare fever
+```{r}
+tab4 <- CreateTableOne(vars = ch_vars_health_fever, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_health_fever, strata = "PHASE")
+
+tab4
+```
 
 #Basic Frequencies 
 
@@ -300,6 +418,11 @@ ccs_data_ch_cdc %>%
   ggplot(aes(color = as_factor(hosp_admit_site))) + 
   geom_point(aes(ccs_gps1_latitude, ccs_gps1_longitude)) +
   scale_color_manual(values = c("black", "red"))
+
+ccs_data_ch_cdc %>% 
+  filter(!is.na(hosp_admit_site) | trt == 1 ) %>% 
+  write_csv()
+  
   
 ```
 
