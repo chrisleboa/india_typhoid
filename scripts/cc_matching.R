@@ -13,6 +13,7 @@ library(tableone)
 library(lubridate)
 library(MatchIt)
 
+
 data_location <- "/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__2021_04_18.sas7bdat"
 #dataset with all data in it up to March 2021
 
@@ -80,20 +81,36 @@ cc_matches %>%
   ) %>%
   group_by(pair) %>%
   ggplot(aes(Dif_age, Dif_date, color = pair)) +
-  geom_point()
+  geom_jitter()
 
 
 cc_matches %>%
   as_tibble() %>%
   dplyr::select(pair, styphi, phase, TCV_vax) %>%
-  DescTools::ConDisPairs()
+  ConDisPairs()
 
+#Don't list concordant pairs like this for multiple controls
 cc_matches %>%
   dplyr::select(pair, type, phase, TCV_vax) %>%
   pivot_wider(names_from = type, values_from = c(phase, TCV_vax)) %>%
   mutate(
     concordant = if_else(phase_treatment == phase_control.1 & phase_control.2 & phase_control.3, 1, 0)
     ) %>%
-  View()
   count(phase_treatment, concordant)
 
+cc_matches %>%
+  ggplot(aes(AGEYR, fill = styphi)) +
+  geom_histogram(position = "dodge") +
+  labs(
+    title = "Age distribution of case control matches",
+    x = "Age of participant (year)",
+    fill  = "Blood Culture Status",
+    y = "Number of Individuals"
+    )
+
+cc_matches %>%
+  filter(styphi == "Pos") %>%
+  summarize(
+    mean(AGEYR, na.rm = TRUE),
+    median(AGEYR, na.rm = TRUE)
+    )

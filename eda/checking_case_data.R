@@ -31,8 +31,10 @@ all_data %>%
     str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
   ) %>%
   replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0)) %>%
-  count(phase, TCV_vax) %>%
-  knitr::kable()
+  count(phase, TCV_vax)
+
+
+
 
 all_data %>%
   filter(
@@ -58,3 +60,16 @@ all_data %>%
     color = "Vaccination Status"
   )
 
+
+
+all_data %>%
+  filter(
+    styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
+  ) %>%
+  replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0)) %>%
+  filter(phase == 2, TCV_vax == "Yes (VE)") %>%
+  write_csv("/Users/ChrisLeBoa/GitHub/typhoid_research/india_typhoid/data/phase_2_ve.csv")

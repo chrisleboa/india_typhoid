@@ -80,6 +80,50 @@ all_data %>%
   #select(UHP, phase) %>%
   count(UHP, phase, results_yn, styphi)
 
-%>%
-  count(ENRL_TYPE, phase, results_yn) %>%
-  knitr::kable()
+
+
+
+
+all_data %>%
+  filter(
+    #ENRL_TYPE == 1,                                 #Only clinical enrollment
+    #styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE,  # Remove UHP's marked as No for not in NMMC
+    is.na(phase)
+  ) %>%
+  ggplot(aes(FEVERDAYS)) +
+  geom_histogram(fill = "darkred") +
+  labs(
+    title = "Distribution of time of fever before enrollment",
+    y = "Number of patients",
+    x = "Days of Fever symptopms"
+  )
+
+
+
+all_data %>%
+  filter(
+    #ENRL_TYPE == 1,                                 #Only clinical enrollment
+    #styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE,  # Remove UHP's marked as No for not in NMMC
+    is.na(phase)
+  ) %>%
+  ggplot(aes(oschdaysmiss)) +
+  geom_histogram(fill = "darkred", binwidth = 1, center = .5) +
+  labs(
+    title = "Number of school days missed due to fever",
+    y = "Number of patients",
+    x = "Days"
+  )
+
+
+## Show distribution of ages in case data
+
+
+

@@ -337,6 +337,17 @@ ch_vars_health_fever <-
     "Hospitalization location (12 months)" 
   )
 
+ch_vars_health_fever2 <- 
+  c(
+    "Fever in last month",
+    "3 Day Fever (30 days)",
+    "Sought treatment for Fever (30 days)", 
+    "Fever Treatment Location (30 days)", 
+    "Fever where child missed school (12 months)", 
+    "Fever with hospitalization (12 months)", 
+    "Hospitalization location (12 months)" 
+  )
+
 ch_cat_vars_dem <- c("Child Schooling", "Child Education")
 ch_cat_vars_health_vax <- c("Other Typhoid Vaccine Type")
 ch_cat_vars_health_fever <- c("Fever other symptoms (30 days)", "Fever Treatment Location (30 days)" )
@@ -426,4 +437,9 @@ ccs_data_ch_cdc %>%
   
 ```
 
+```{r}
+tab5 <- CreateTableOne(vars = ch_vars_health_fever2, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_health_fever, strata = "Received Typhoid Vaccine")
+
+tab5
+```
 
