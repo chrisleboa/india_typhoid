@@ -1,0 +1,469 @@
+---
+title: "TCV Vaccination Status"
+author: "Chris LeBoa"
+date: "8/19/2021"
+output: word_document
+---
+
+## Evaluating Vaccination Status within the Navi Mumbai Project 
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# Add libraries 
+library(tidyverse)
+library(haven)
+library(lubridate)
+library(fs)
+library(tableone)
+
+
+
+
+ccs_data_ch_cdc <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch_2020_03_18.sas7bdat")
+ ##This is the Child based file with the addition of specific CDC variables 
+
+data_location <- "/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__2021_04_18_vax.sas7bdat"
+ ##dataset with all hospital data in it up to april 2021
+
+#Read in data 
+all_data <- read_sas(data_location)
+
+```
+```{r recode lists}
+
+# Parameters 
+
+sex_recode <- 
+  c(
+  `1` = "Male",
+  `2` = "Female"
+)
+
+yes_no_recode <- 
+   c(
+  `1` = "Yes",
+  `0` = "No"
+)
+
+hhead_recode <- c(
+  `1` = "Respondent",
+`2` = "Father of child", 
+`3` = "Mother of child", 
+`4` = "Grandparent of child", 
+`88` = "Other",
+`99` = "Declined to answer"
+)
+
+status_recode <- c(
+  INT = "Interviewed-Eligible",
+  ZEH = "Discovered no/zero eligible HH members",
+  REF = "Refused-Eligible",
+  VAC = "Clearly vacant house",
+  UNA =  "Unavailable-believed to be eligible",
+  NAU = "Not available-eligbility unconfirmed",
+  NNC = "Not Available- Non-eligibility confirmed"
+)
+
+hh_edu_recode <- c(
+  `1` = "Illiterate",
+  `2` = "Primary school certificate (through Grade 4)",
+  `3` = "Middle school certificate (Grade 5 - 10)",
+  `4` = "High school certificate (Grade 11 - 12)",
+  `5` = "Intermediate or post high school diploma",
+  `6` = "Graduate (Bachelors degree)",
+  `7` = "Post graduate, profession, or honors"
+)
+
+hh_occu_recode <- c(
+  `1` = "Legislators, Senior Officials & Managers",
+ `2` = "Professionals (e.g. Doctors, Engineers, Bank managers)",
+ `3` = "Technicians and Associate Professionals", 
+ `4` = "Clerks",
+ `5` = "Skilled Workers and Shop & Market Sales Workers",
+ `6` = "Skilled Agricultural & Fishery Workers",
+ `7` = "Craft & Related Trade Workers",
+ `8` = "Plant & Machine Operators and Assemblers",
+ `9` = "Elementary Occupation (e.g. Domestic servant, peon, watchman)",
+ `10` = "Mathadi or quarry workers",
+ `11` = "Unemployed",
+ `88` = "Other",
+ `99` = "Refused"
+)
+
+toilet_recode <- c(
+  `1` = "No facility / open defecation",
+  `2` = "Traditional pit latrine",
+  `3` = "Sarvajanik toilet (public toilets on the streets)",
+  `4` = "Flush toilet",
+  `88` = "Other", 
+  `99` = "Refused"
+)
+
+child_schooling_recode <- c(
+  `1` = "Yes", 
+  `2` = "Not of school age",
+  `3` = "Never attended school", 
+  `99` = "DK/Refused"
+)
+
+child_schooling_level_recode <- c(
+  `1` = "Illiterate",
+  `2` = "Primary school certificate (through Grade 4)",
+  `3` = "Middle school certificate (Grade 5 - 10)",
+  `4` = "High school certificate (Grade 11 - 12)",
+  `99` ="Declined to answer"
+)
+
+yes_no_school_recode <- 
+   c(
+  `1` = "Yes",
+  `0` = "No", 
+  `2` = "Child doesn’t attend school"
+)
+```
+```{r ccs variable cleaning}
+
+
+ccs_dara_ch_formatted <- 
+  ccs_data_ch_cdc %>% 
+  transmute(
+    "Houshold Size" = numhh, 
+    "PHASE" = PHASE,
+    "Chuld age" = ageyrcalc, 
+    "Child Under 5" = if_else(ageyrcalc <= 5, "Yes", "No"), 
+    "Child Time in Navi Mumbai" = ve_chliveyr, 
+    "Child Sex" = recode(sex, !!!sex_recode), 
+    "Child Schooling" = recode(school, !!!child_schooling_recode),
+    "Child Education" = recode(chedu, !!!child_schooling_level_recode), 
+    "Received All Normal Vaccines" = recode(ve_allvacs, !!!yes_no_recode),
+    "Received Typhoid Vaccine" = recode(ve_tvac, !!!yes_no_recode),
+    "Typhoid Vaccine Campaign" = recode(tcv_vax, !!!yes_no_recode), 
+    "Other Typhoid Vaccine" = recode(typhoid_vax, !!!yes_no_recode), 
+    "Other Typhoid Vaccine Type" = 
+      case_when(
+        ve_ncothtyp_a == 1 ~ "TCV",
+        ve_ncothtyp_b == 1 ~ "Polysaccharide", 
+        ve_ncothtyp_c == 1 ~ "Not Specified", 
+        TRUE ~ NA_character_
+      ),
+    "Fever in last month" = recode(fev1mo, !!!yes_no_recode),
+    "Fever other symptoms (30 days)" =
+      case_when(
+      symp_a == 1 ~ "none", 
+      symp_b == 1 ~ "cold/runny nose",
+      symp_c == 1 ~ "headache",
+      symp_d == 1 ~ "bodyache",
+      symp_e == 1 ~ "sore throat",
+      symp_f == 1 ~ "rash",
+      symp_e == 1 ~ "cough",
+      symp_g == 1 ~ "ear infection",
+      symp_h == 1 ~ "skin boils",
+      symp_i == 1 ~ "diarrhea",
+      symp_j == 1 ~ "abdominal pain",
+      TRUE ~ NA_character_
+    ), 
+    "Fever where child missed school (30 days)" = recode(fever_sch30, !!!yes_no_school_recode ), 
+    "Fever where hh member missed work (30 days)" = recode(fever_work30, !!!yes_no_recode), 
+    "Fever where perscribed antibiotics (30 days)" = recode(fever_antibiotics30, !!!yes_no_recode), 
+    "Fever where child missed school (3 months)" = recode(fever_sch3, !!!yes_no_school_recode), 
+    "Child fever where hh member missed work (3 months)" = recode(fever_work3, !!!yes_no_recode),
+    "Fever where perscribed antibiotics (3 months)" = recode(fever_antibiotics3, !!!yes_no_recode),
+    "Sought treatment for Fever (30 days)" = recode(trt, !!!yes_no_recode), 
+    "Fever Treatment Location (30 days)" = 
+      case_when(
+        ccs_trtloc_a == "1" | ccs_trtloc_b == "1" | ccs_trtloc_c == "1" |ccs_trtloc_d == "1" ~ "study site", 
+        ccs_trtloc_a == "1" | ccs_trtloc_b == "1" | ccs_trtloc_c == "1" |ccs_trtloc_d == "1"| ccs_trtloc_e == "1" | ccs_trtloc_f == "1" | ccs_trtloc_g == "1" | ccs_trtloc_i == "1" ~ "Hospital (including study sites)", 
+        ccs_trtloc_j == "1" ~ "Private physician/clinic",
+        ccs_trtloc_k == "1" ~ "Pharmacy",
+        TRUE ~ NA_character_
+      ),
+    "Study Site Treatment Location" = 
+      if_else(
+      ccs_trtloc_a == "1" |
+        ccs_trtloc_b == "1" |
+        ccs_trtloc_c == "1" |
+        ccs_trtloc_d == "1" , 
+      "Yes", "No"), 
+    "Fever where child missed school (12 months)" = recode(fever_sch, !!!yes_no_school_recode ), 
+    "Fever where hh member missed work (12 months)" = recode(fever_work, !!!yes_no_recode), 
+    "Fever where perscribed antibiotics (12 months)" = recode(fever_antibiotics, !!!yes_no_recode),
+    "Fever with hospitalization (12 months)" = recode(hosp, !!! yes_no_recode), 
+    "Hospitalization location (12 months)" = if_else(hosp_admit_site == 1, "study site", "not study site")
+  )
+  
+ch_vars <- 
+  c(
+    "Houshold Size",
+    "Chuld age",
+    "Child Under 5",
+    "Child Time in Navi Mumbai",
+    "Child Sex",
+    "Child Schooling",
+    "Child Education", 
+    "Typhoid Vaccine Campaign", 
+    "Other Typhoid Vaccine",
+    "Fever in last month",
+    "3 Day Fever",
+    "Fever Treatment",
+    "Study Site Treatment Location"
+    )
+
+ch_vars_dem <- 
+  c(
+    "Houshold Size",
+    "Chuld age", 
+    "Child Under 5",
+    "Child Time in Navi Mumbai",
+    "Child Sex",
+    "Child Schooling",
+    "Child Education"
+    )
+
+ch_vars_health_vax <- 
+  c(
+    "Received Typhoid Vaccine",
+    "Typhoid Vaccine Campaign",
+    "Other Typhoid Vaccine",
+    "Other Typhoid Vaccine Type"
+    )
+
+ch_vars_health_fever <- 
+  c(
+    "Fever in last month",
+    "3 Day Fever (30 days)",
+    "Fever other symptoms (30 days)",
+    "Fever where child missed school (30 days)", 
+    "Fever where hh member missed work (30 days)", 
+    "Fever where perscribed antibiotics (30 days)", 
+    "Sought treatment for Fever (30 days)", 
+    "Fever Treatment Location (30 days)", 
+    "Fever where child missed school (3 months)", 
+    "Child fever where hh member missed work (3 months)", 
+    "Fever where perscribed antibiotics (3 months)",
+    "Fever where child missed school (12 months)", 
+    "Fever where hh member missed work (12 months)", 
+    "Fever where perscribed antibiotics (12 months)", 
+    "Fever with hospitalization (12 months)", 
+    "Hospitalization location (12 months)" 
+  )
+
+ch_vars_health_fever2 <- 
+  c(
+    "Fever in last month",
+    "3 Day Fever (30 days)",
+    "Sought treatment for Fever (30 days)", 
+    "Fever Treatment Location (30 days)", 
+    "Fever where child missed school (12 months)", 
+    "Fever with hospitalization (12 months)"
+  )
+
+ch_cat_vars_dem <- c("Child Schooling", "Child Education")
+ch_cat_vars_health_vax <- c("Other Typhoid Vaccine Type")
+ch_cat_vars_health_fever <- c("Fever other symptoms (30 days)", "Fever Treatment Location (30 days)" )
+```
+
+In the Navi Mumbai TCV project our team has planned to to a test negaitve design
+for evaluating the impact of the TCV vaccination. 
+(For more information on this design please see the analysis plan also attached to this email) 
+
+This analysis relies on using a participant's (who sought healthcare at a surveillance site and had fever for >3 days) phase and vaccine status as exposures and the Typhi blood culture results as the outcome.
+
+However, the condition of healthcare exposure and the method for determining vaccination may render a different population than the population of those areas. Our method of going back to case households to determine type of vaccine through the vaccine effectiveness questionaire but not going back to households that test blood culture negative for S.Typhi may disproportionately undercount the percentage of blood culture negative individuals who have received a typhi vaccine. 
+
+**This script is meant to answer the following questions:**
+
+What proportion of the overall Navi Mumbai eligible population report getting a TCV Vaccine? 
+
+Of those who meet the enrollment definition, what proportion report getting a TCV vaccine? How does this differ between phase 1 and phase 2 areas
+
+How much do we alter the definition of vaccinated between the VE analysis and this updated definition? 
+
+When matching cases and controls, how much do the ages and calendar dates differ between matched pairs? 
+
+## Community Survey Results on Vaccination Status and Healthcare seeking 
+
+We went to a representative sample of the poplation living in Navi Mumbai and asked about healthcare seeking behaviour and vaccination status 
+```{r}
+tab4 <- CreateTableOne(vars = ch_vars_health_vax, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_health_vax, strata = "PHASE")
+
+kableone(tab4)
+```
+
+From these measures we would expect > 70% of individuals from phase 1 areas to have received some type of typhoid vaccine (The official reports of the campaign said that it was 71% of the population reached), and our data indicates nearly 60% receiving received the vaccine from the mass vaccination campaign. 
+
+```{r}
+tab5 <- CreateTableOne(vars = ch_vars_health_fever2, data = ccs_dara_ch_formatted, factorVars = ch_cat_vars_health_fever, strata = "PHASE")
+
+kableone(tab5)
+```
+We see from the CCS data that the proportion of individuals that seek care at a study site is approcimately the same between phase 1 areas. 
+
+Within phase one areas is there a difference in hospital seeking behaviour by vaccination status?  
+```{r}
+
+tab5 <- CreateTableOne(vars = ch_vars_health_fever2, data = ccs_dara_ch_formatted %>% filter(PHASE == 1), factorVars = ch_cat_vars_health_fever, strata = "Received Typhoid Vaccine")
+
+kableone(tab5)
+```
+   
+While we see a slightly higher proportion of unvaccinated phase 1 individuals reporting going to hospitals if they have a fever, a smaller proporion of those go to a study site (3.1% compared to 4.9% of unvaccinated who get fever). The sample size for those visiting a study site us small though and really does not diverge that direstically from the overall propotion of those from phase 1 areas (3.1% compared to 3.5%), indicating that from the CCS evidence we would not expect the healthcare seeking population of those in phasen 1 to be highly divergent by vaccination status. 
+
+## Hospital Enrollment 
+
+Four conditions had to be met to meet the enrollment criteria 
+
+They are 
+    Enrollment after the vaccination campaign 
+    Coming into a study site with at least three days fever
+    Older than 9 months and <= 16 years (children up to 14 were vaccinated so this might need to be coded better to track with the campaign)
+    Live in NMMC 
+    
+```{r}
+all_data %>%
+  filter(
+    #styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
+  ) %>%
+  replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0)) %>%
+  count(phase, styphi) %>% 
+  pivot_wider(names_from = phase, values_from = n) %>% 
+  knitr::kable()
+
+```
+We see that that there were a total of 81 Typhi cases meeting this case definition, 
+36 from phase 1 areas and 45 from phase 2 areas. 
+
+Possible limitation from data collection: 
+As seen here, there are 349 individuals (all who test negative for S.Typhi) who
+have no UHP and thus no phase listed. We checked with the india team about
+why these individuals were missing UHP information. They responsed that the UHP/ 
+sector variable was not required until 1/17/2019 and after that date there are no
+missings but from the September - December of 2018 349 hospital based who otherwise 
+meet the enrollment definition that are missing a phase for analysis. 
+
+##### Number with VE Conducted 
+```{r}
+all_data %>%
+  filter(
+    styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
+  ) %>%
+  replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0)) %>%
+  filter(ve_formid != "") %>% 
+  summarise(
+   "VE Completed" = n(), 
+   "Percent (%)" = round(n() / 81 *100, 1)
+  ) %>% 
+  knitr::kable()
+```
+
+Out of the 81 S.Typhi cases meeting the enrollment criteria, *59 (73%)* had a project 
+staff member return to their house to conduct a long-form interview on the type of vaccines they 
+had received and to check the the family's typhoid vaccination card. 
+
+For those that were enrolled who did not test Blood culture positive, a followup house visit was not conducted
+and vaccination status was instead based on the materials brought with them at the time of enrollment or their recall
+
+# TCV Vaccination Amongst Cases 
+```{r}
+all_data %>%
+  filter(
+    styphi == "Pos",                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
+  ) %>%
+  replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0)) %>%
+  count(TCV_vax, TCV_vax_strict, TCV_vax_conserved) %>% 
+  knitr::kable()
+```
+Of the 81 cases, 21 had indicated receiving "Some type of typhoid vaccine"
+Of these we made two variables - 
+
+*TCV strict*- which counts someone only as a vaccinated individual if a TCV was
+found in the VE questionaire (only given to cases)
+
+and 
+
+*TCV conserved* - which counts vaccinated as if they had received TCV through the VE questionaire or had 
+"TCV or tybar" written on the papers they brought to the clinic on the date of enrollment. 
+(This again overly emphesizes cases as being vaccinated)
+
+Since we could not ensure the others (recalled getting vaccinated) were TCV
+positive or had received another sort of typhi vaccine they were not included in these definitions. 
+
+## Vaccinations amongst cases and controls 
+
+Using the conserved TCV vaccine definition we counted the number of vaccinated amongst phase 1 and phase 2 areas
+```{r}
+cc_data <-
+  all_data %>%
+  filter(
+  #  !is.na(styphi),                                 #blood culture pos for typhi
+    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
+    LIVE_NMMC == 1,                                  # Select children that live in NMMC
+    str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
+  ) %>%
+  mutate(TR = if_else(styphi == "Pos", 1, 0)) %>%
+  replace_na(list(ve_nctcv = 0, ve_tcvcard = 0, ve_ncothtyp_a = 0))
+
+cc_data %>%
+  filter(!is.na(phase)) %>%
+  count(phase, TCV_vax_conserved) %>% 
+  pivot_wider(names_from = phase, values_from = n) %>% 
+  knitr::kable()
+
+
+```
+Suprisingly according to the TCV vax conserve variable -- which we were expecing to use for the impact analysis -- 
+
+There were the same number of people in phase 1 and phase 2 areas who had been vaccinated with TCV and 
+a higher proportion of vaccinated individuals in phase 2 areas
+
+#All Vaccination Phase 1 vs Phase 2
+```{r}
+
+cc_data %>%
+  filter(!is.na(phase)) %>%
+  count(phase, TCV_vax) %>% 
+  pivot_wider(names_from = phase, values_from = n) %>% 
+  knitr::kable()
+```
+When we look at the original TCV vax variable instead of the subsetted variable 
+we see a higher proportion of people in phase 1 areas recall receiving "some type of Typhoid vaccination" 
+but since there was no card or specific vaccine type recall we did not consider them "vaccinated with tcv" 
+and because they tested negative for typhi we did not go back to those households for further confirmation. 
+
+Also even if we decide to consider the recall vaccinated as well the vaccination rate in phase 1 areas would only amount to 
+30.9% (475/ 1,534), much lower than the 71% expected to be vaccinated in these areas, indicating that the population seeking care is probably not a representative sample of the entire population and that we may still be missing vaccinations since we are mainly relying on recalled answers. 
+
+## Case matching 
+
+When case matching was conducted (using the matchit package), few cases or controls 
+from phase 1 or phase two areas report being vaccinated and the proportion of vaccination
+is highest amongst cases (probably because of the going back to cases only for confirmation)
+
+Vaccinated phase 1 case  = 7 / 36   = 19.4%
+
+Vaccinated phase 2 case  = 6 / 45   = 13.3%
+
+Vaccinated phase 1 control  = 5 / 146  = 3.4%
+
+Vaccinated phase 2 control  = 8 / 82   = 9.8%
+
+
+
+
+
+
+
+
