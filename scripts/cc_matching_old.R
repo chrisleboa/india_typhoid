@@ -38,7 +38,7 @@ cc_data <-
   all_data %>%
   filter(
   #  !is.na(styphi),                                 #blood culture pos for typhi
-    cc_completed_time >= as_date("2018-09-01"),      #select participants after september 1 2018
+    cc_completed_time <= as_date("2018-09-01"),      #select participants after september 1 2018
     (AGEYR <= 15 & AGEYR >= 0) | (AGEYR == 0 & AGEMO >= 9),      # Max age less than 16     # Min age > 9 months
     LIVE_NMMC == 1,                                  # Select children that live in NMMC
     str_detect(UHP, "NO_") == FALSE  # Remove UHP's marked as No for not in NMMC
