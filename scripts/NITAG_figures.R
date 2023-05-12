@@ -21,12 +21,12 @@ library(ggsci)
 #Plots histogram of participant age (of matched data) by
 plot_1 <-
   cc_matches_case %>%
-  mutate(cases = if_else(case != 1, "Blood-culture negative cases”", "Blood-culture positive cases")) %>%
+  mutate(cases = if_else(case != 1, "Blood-culture negative controls", "Blood-culture positive cases")) %>%
   ggplot(aes(AGEYR, fill = cases)) +
   geom_histogram(position = "dodge") +
   theme_bw() +
   theme(legend.position = c(.8,.9), legend.key.size = unit(1, 'cm')) +
-  expand(c(0,0))
+  #expand(c(0,0)) +
   scale_fill_nejm() +
   labs(
     title = "Age distribution of case control matches",
@@ -44,7 +44,7 @@ by_month <- function(x,n=1){
 ## Plot cases and controls by month of enrollment
 plot_2 <-
   cc_matches_case %>%
-  mutate(cases = if_else(case != 1, "Blood-culture negative cases”", "Blood-culture positive cases")) %>%
+  mutate(cases = if_else(case != 1, "Blood-culture negative controls", "Blood-culture positive cases")) %>%
   #filter(cases == "Case") %>%
   ggplot(aes(cc_completed_time, fill = cases)) +
   geom_histogram(breaks = by_month(cc_matches_case$cc_completed_time), position = "dodge") +

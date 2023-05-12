@@ -1,0 +1,66 @@
+---
+title: "TCV Vaccination Status"
+author: "Chris LeBoa"
+date: "8/19/2021"
+output: word_document
+---
+
+## Evaluating Vaccination Status within the Navi Mumbai Project 
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# Add libraries 
+library(tidyverse)
+library(haven)
+library(lubridate)
+library(fs)
+library(tableone)
+
+
+
+
+ccs_data_ch_cdc <- read_sas("/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/ccs_ch_2020_03_18.sas7bdat")
+ ##This is the Child based file with the addition of specific CDC variables 
+
+data_location <- "/Users/ChrisLeBoa/Box Sync/CDC_Typhoid_data/tcv_all__2021_04_18_vax.sas7bdat"
+ ##dataset with all hospital data in it up to april 2021
+
+#Read in data 
+all_data <- read_sas(data_location)
+
+```
+
+#IVI wanted an estimate of the % of Typoid cases that were hospitalized
+
+We ask about three day fever with a recall period but hospitalization in terms of a 12 month recall period. 
+
+```{r, scientific = FALSE}
+options(scipen=999) #This turns off scientific notation
+
+ccs_data_ch_cdc %>% 
+  mutate(
+    seek_care_hospital = if_else( ccs_trtloc_a == "1" | ccs_trtloc_b == "1" | ccs_trtloc_c == "1" |ccs_trtloc_d == "1"| ccs_trtloc_e == "1" | ccs_trtloc_f == "1" | ccs_trtloc_g == "1" | ccs_trtloc_i == "1", 1, 0), 
+    across(where(is.numeric), ~na_if(., 99))) %>% 
+  group_by(PHASE) %>% 
+  summarise(
+    total_fever_per_month = sum(fev3day, na.rm = TRUE), 
+    total_fever_per_year = total_fever_per_month * (365 / 30), 
+    total_children = n(), 
+    prop_children_fev_mon = total_fever_per_month / total_children, 
+    prop_children_fev_year = total_fever_per_year / total_children,
+    percent_fever_hospitalized_year = 
+      sum(hosp, na.rm = TRUE) / total_fever_per_year * 100, 
+    percent_fever_sought_care_one_month = 
+      sum(seek_care_hospital, na.rm = TRUE) / total_fever_per_month * 100
+  ) %>% 
+  pivot_longer(-PHASE, names_to = "Variable") %>% 
+  pivot_wider(names_from = PHASE, values_from = value) %>%
+  mutate_if(is.numeric, ~round(., 3)) %>% 
+  write_csv("/Users/ChrisLeBoa/GitHub/typhoid_research/india_typhoid/data/Data_for_IVI_220723.csv")
+
+
+```
+
+
+

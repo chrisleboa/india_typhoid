@@ -305,6 +305,8 @@ Within phase one areas is there a difference in hospital seeking behaviour by va
 tab5 <- CreateTableOne(vars = ch_vars_health_fever2, data = ccs_dara_ch_formatted %>% filter(PHASE == 1), factorVars = ch_cat_vars_health_fever, strata = "Received Typhoid Vaccine")
 
 kableone(tab5)
+
+
 ```
    
 While we see a slightly higher proportion of unvaccinated phase 1 individuals reporting going to hospitals if they have a fever, a smaller proporion of those go to a study site (3.1% compared to 4.9% of unvaccinated who get fever). The sample size for those visiting a study site us small though and really does not diverge that direstically from the overall propotion of those from phase 1 areas (3.1% compared to 3.5%), indicating that from the CCS evidence we would not expect the healthcare seeking population of those in phasen 1 to be highly divergent by vaccination status. 
@@ -462,6 +464,9 @@ Vaccinated phase 2 control  = 8 / 82   = 9.8%
 
 
 
+```{r}
+
+```
 
 
 
