@@ -4,7 +4,7 @@
 # Version: 2023-03-17
 
 # Libraries
-install.packages("MatchIt")
+#install.packages("MatchIt")
 library(tidyverse)
 library(haven)
 library(lubridate)
@@ -28,7 +28,7 @@ data <- read_sas("/Users/ChrisLeBoa/Library/CloudStorage/Box-Box/CDC_Typhoid_dat
   # 4) whose age was within 12 months of the age of the matched case.
         #Use agemocalc = 12 variable
 
-## I think that we should use the MatchIT package like in the other analysis
+## I think that we should use the MatchIT package like in the other VE analysis
 
 # Libraries
 library(tidyverse)
@@ -88,7 +88,7 @@ case_control_data %>%
 cc_data <-
   cc_filter %>%
   filter(
-    dt_enrolled >= as_date("2018-09-01"),  #Date enrolled is after campaign
+    dt_enrolled >= as_date("2018-07-01"),  #Date enrolled is after campaign
     age_mo_shot >= 9 & age_mo_shot <= (14*12), #Age is between 9 months and 14 at time of campaign
     fev1mo == 0 | is.na(fev1mo)          #there is no fever in last month
     )
