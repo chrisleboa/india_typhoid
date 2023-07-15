@@ -35,7 +35,6 @@ library(tidyverse)
 library(haven)
 
 
-
 data_location <- "/Users/ChrisLeBoa/Library/CloudStorage/Box-Box/CDC_Typhoid_data/tcv_all__2021_04_18_vax_08_31.sas7bdat"
 data_location_cc <- "/Users/ChrisLeBoa/Library/CloudStorage/Box-Box/CDC_Typhoid_data/tcv_caco__2020_07_06.sas7bdat"
 #dataset with all data in it up to March 2021
@@ -45,6 +44,8 @@ data_location_cc <- "/Users/ChrisLeBoa/Library/CloudStorage/Box-Box/CDC_Typhoid_
 #Read in data
 all_data <- read_sas(data_location)
 case_control_data <- read_sas(data_location_cc)
+
+ccs_data <- read_sas("/Users/ChrisLeBoa/Library/CloudStorage/Box-Box/CDC_Typhoid_data/ccs_ch_2020_04_24_ver2.sas7bdat")
 
 #The age also must be within 1 year of the control
 
@@ -93,10 +94,20 @@ cc_data <-
     fev1mo == 0 | is.na(fev1mo)          #there is no fever in last month
     )
 
-cc_data %>%
-  filter(case==1) %>%
-  count(fev1mo)
 #Confirming that all non cases are not missing a fever variable
+
+### Calculating numbers for figure 1
+
+cc_filter %>%
+  count(case)
+
+  cc_filter %>%
+  filter(
+    age_mo_shot >= 9 & age_mo_shot <= (14*12)) %>%
+      count(case)
+
+  cc_data %>%
+    count(tcv_vax, case)
 
 ####### Creation of matched data
   # As we do not want to match based on those who have an unknown vaccine type (and are removing the unknown types from the dataset above)
@@ -208,7 +219,7 @@ cc_matches_tcv_card <-
 
 #This dataset is the same as analysis dataset #1 but the contols are selected from a less conservative pool
 
-#3
+#3 This is the main dataset used for analysis
  cc_data_tcv_vax <-
    cc_data %>%
    filter(tcv_vax != 99)
@@ -251,12 +262,14 @@ cc_matches_tcv_card <-
  plot(caco_results, type = "jitter", interactive = FALSE) #This plots the number matched and the number unmatched
 
  cc_matches_tcv_vax %>% #Print number matched cases and controls
-   count(case)
+   count(case, tcv_vax)
 
 
 
 
  #4 TCV any
+
+ # The definition for this variable in the codebook is unclear and I feel unable to use it.
  cc_data_tcv_any <- #change
    cc_data %>%
    filter(tcv_any!= 99) #Change to keep up with vaccination status of interest
@@ -309,6 +322,8 @@ cc_matches_tcv_card <-
 
  cc_data_typhoid_vax_any %>%  #Change
    count(case)
+
+ cc_data_typhoid_vax_any %>% count(case, typhoid_vax_any)
 
  caco_results <-
    matchit(case ~ agemocalc + dt_enrolled , data = cc_data_typhoid_vax_any, caliper = c(agemocalc = 12, dt_enrolled = 14), #Change

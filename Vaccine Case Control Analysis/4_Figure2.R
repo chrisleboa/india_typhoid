@@ -1,5 +1,5 @@
 # Figure 2 code
-  #This file creates a forest plot of the model results from the VE analysis of the india typhoid vaccine data
+  #This file creates a forest plot of the model results from the VE analysis of the india typhoid vaccine data for the vaccine impact paper.
 # Author: Chris LeBoa
 # Version: 2023-05-03
 

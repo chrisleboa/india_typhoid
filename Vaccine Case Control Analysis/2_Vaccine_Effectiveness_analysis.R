@@ -36,7 +36,7 @@ cc_matches_tcv_vax %>% count(case, tcv_vax)
 
 
 
-#4 Using TCV any variable (Less sure how this one is defined in terms of what the #3's are)
+#4 Using TCV any variable (Is defined as answering 1`,2 or 3 on the Typhoid_vax variable)
 summary(clogit(case ~ factor(tcv_any) + strata(pair), cc_matches_tcv_any))
 
 #5 Using any Typhoid vaccine variable
